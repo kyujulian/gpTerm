@@ -93,11 +93,31 @@ impl ApiHandler {
             format!("http://127.0.0.1:7878/{}",call_params.get_prompt())
         )
             .send()
-            .await.unwrap()
-            .json::<ApiResponse>();
+            .await;
         
+        match res {
+            Ok(okay) => {
+                let debug_json = format!("{:#?}",okay);
+                let res = okay
+                    .json::<ApiResponse>();
 
-        return res.await
+                let json_res = res.await;
+
+                match json_res {
+                    Ok(okay) => return Ok(okay),
+                    Err(err) => {
+                        error!("Couldn't parse received request");
+                        debug!("RECEIVED: {}",debug_json);
+                        return Err(err)
+                    }
+                    
+                }
+            }
+            Err(err) => {
+                error!("Couldn't get api response");
+                return Err(err)
+            }
+        }
 
     }
     //this function works, that's very nice
@@ -128,11 +148,22 @@ impl ApiHandler {
         .await;
 
         match res {
-            Ok(_) => {
-                let res = res.expect("it got to okay.. so it should work, API CALL")
+            Ok(okay) => {
+                let debug_json = format!("{:#?}",okay);
+                let res = okay
                     .json::<ApiResponse>();
 
-                return res.await
+                let json_res = res.await;
+
+                match json_res {
+                    Ok(res) => return Ok(res),
+                    Err(err) => {
+                        error!("Couldn't parse received request");
+                        debug!("RECEIVED: {}",debug_json);
+                        return Err(err)
+                    }
+                    
+                }
             }
             Err(err) => {
                 error!("Couldn't get api response");
@@ -168,15 +199,13 @@ impl ApiHandler {
                 Some(ans)
             }
             Err(_) => {
-                error!("Couldn't get answer, probably problem parsing request");
+                error!("Couldn't get answer");
+                error!("ERROR: {:#?}", answer);
                 None
             }
         };
 
-
-
         self.message_from_answer(self.response.as_ref())
-
     }
 
     fn message_from_answer(&self, answer: Option<&ApiResponse>) -> Message {
@@ -190,7 +219,8 @@ impl ApiHandler {
             }
             None => {
                 sender = "YAS - your average system".to_string();
-                body = "something went wrong in the request, try again".to_string();
+                body = "something went wrong in the request (probably problem
+                parsing the response), try again".to_string();
             }
         }
 

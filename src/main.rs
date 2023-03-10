@@ -47,21 +47,6 @@ async fn main() -> Result<(), Box<dyn Error>>{
     let _handle = logging::set_logging(log_file, request_file);
 
 
-    //kinda working
-    error!("this is test");
-    trace!("this is test");
-    debug!("this is test");
-    info!("this is test");
-    warn!("this is test");
-
-
-
-
-
-
-
-
-    
     //*****************LOGGING************************************
     //setup terminal
     enable_raw_mode()?;
@@ -110,7 +95,7 @@ async fn main() -> Result<(), Box<dyn Error>>{
 
 async fn run_app<B: Backend>(terminal : &mut Terminal<B>, mut app: App) -> io::Result<()> {
 
-    let mut file = File::create("request.txt")?;
+    // let mut file = File::create("request.txt")?;
     loop {
 
         terminal.draw(|f| ui(f, &app))?;
@@ -154,7 +139,7 @@ async fn run_app<B: Backend>(terminal : &mut Terminal<B>, mut app: App) -> io::R
 
                                 let thing = app.get_call();
 
-                                file.write_all(format!("{:#?}",thing).as_bytes())?;
+                                // file.write_all(format!("{:#?}",thing).as_bytes())?;
 
                                 app.scroll_to_bottom();
                             }
