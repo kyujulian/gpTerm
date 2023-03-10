@@ -1,3 +1,7 @@
+//logging
+use log::{debug, error, info, trace, warn, LevelFilter, SetLoggerError};
+
+
 
 use crossterm:: {
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
@@ -22,8 +26,8 @@ use tui::{
 use unicode_width::UnicodeWidthStr;
 
 use app::{App, InputMode, MessageType};
-use api::{ApiHandler};
 
+mod logging;
 mod api;
 mod app;
 
@@ -32,6 +36,33 @@ mod app;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>>{
 
+    
+    //setup logging
+    //*****************LOGGING************************************
+
+    let log_file = "./log/logfile";
+    let request_file = "./log/requests";
+
+    // Log trace level output to file where trace is the default level
+    let _handle = logging::set_logging(log_file, request_file);
+
+
+    //kinda working
+    error!("this is test");
+    trace!("this is test");
+    debug!("this is test");
+    info!("this is test");
+    warn!("this is test");
+
+
+
+
+
+
+
+
+    
+    //*****************LOGGING************************************
     //setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();

@@ -1,3 +1,5 @@
+//logging
+use log::{debug, error, info, trace, warn, LevelFilter, SetLoggerError};
 use std::future::Future;
 
 use serde::{Deserialize,Serialize};
@@ -86,7 +88,7 @@ impl ApiHandler {
         &self,
         call_params: &ApiCall,
 
-    ) -> impl Future<Output = Result<ApiResponse, reqwest::Error>> {
+    ) -> Result<ApiResponse, reqwest::Error> {
         let res = self.client.get(
             format!("http://127.0.0.1:7878/{}",call_params.get_prompt())
         )
@@ -95,7 +97,7 @@ impl ApiHandler {
             .json::<ApiResponse>();
         
 
-        return res 
+        return res.await
 
     }
     //this function works, that's very nice
@@ -103,7 +105,7 @@ impl ApiHandler {
         &self,
         call_params: &ApiCall,
 
-    ) -> impl Future<Output = Result<ApiResponse, reqwest::Error>> {
+    ) -> Result<ApiResponse, reqwest::Error> {
 
 
         let call = ApiCall {
@@ -123,12 +125,20 @@ impl ApiHandler {
         .header("Content-Type", "application/json")
         .json(call_params)
         .send()
-        .await.unwrap();
+        .await;
 
-        let res = res
-        .json::<ApiResponse>();
+        match res {
+            Ok(_) => {
+                let res = res.expect("it got to okay.. so it should work, API CALL")
+                    .json::<ApiResponse>();
 
-        return res 
+                return res.await
+            }
+            Err(err) => {
+                error!("Couldn't get api response");
+                return Err(err)
+            }
+        }
     }
 
 
@@ -144,23 +154,45 @@ impl ApiHandler {
         self.update_call(ApiCall::from(model,query,temperature,max_tokens));
         let call = match &self.call  {
             Some(call) => call,
-            None => panic!("didn't found call in struct ApiHandler")
+            None => {
+                panic!("Should be able to build apicall")
+            }
         };
-        // let answer = self.send_dummy_api_reqwest(
-        let answer = self.send_api_reqwest(
+        let answer = self.send_dummy_api_reqwest(
+        // let answer = self.send_api_reqwest(
             &call
         ).await;
 
-        self.response = Some(answer.await.unwrap());
+        self.response = match answer {
+            Ok(ans) => {
+                Some(ans)
+            }
+            Err(_) => {
+                error!("Couldn't get answer, probably problem parsing request");
+                None
+            }
+        };
 
-        self.message_from_answer(self.response.as_ref().expect("could't get api answer my man"))
+
+
+        self.message_from_answer(self.response.as_ref())
 
     }
 
-    fn message_from_answer(&self, answer: &ApiResponse) -> Message {
+    fn message_from_answer(&self, answer: Option<&ApiResponse>) -> Message {
 
-        let body = answer.choices()[0].get_answer();
-        let sender = answer.get_model();
+        let sender: String;
+        let body: String;
+        match answer {
+            Some(answer) => {
+                sender = answer.get_model();
+                body = answer.choices()[0].get_answer();
+            }
+            None => {
+                sender = "YAS - your average system".to_string();
+                body = "something went wrong in the request, try again".to_string();
+            }
+        }
 
         return Message::from(sender,body,MessageType::Answer) 
     }

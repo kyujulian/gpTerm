@@ -1,3 +1,5 @@
+//logging
+use log::{debug, error, info, trace, warn, LevelFilter, SetLoggerError};
 
 use futures::join;
 use std::future::Future;
@@ -16,7 +18,8 @@ fn get_terminal_sizes() -> (u16, u16) {
     if let Some((Width(w), Height(h))) = size {
         return (w - 2, h); //tui borders
     } else {
-    return (0,0)
+        error!("Couldn't get terminal size!");
+        panic!();
     }
 }
 
@@ -73,8 +76,11 @@ pub struct App {
 
     username: String,
     ///current value of the input box
+    should_end: bool,
+
+    ///current value displayed on the input box
     display_input: String,
-    ///
+    ///current value of the input box
     internal_input: String,
     ///Current input mode,
     input_mode: InputMode,
@@ -325,16 +331,23 @@ impl App {
 impl Default for App {
     fn default() -> App {
         App {
+            should_end: false,
+            scroll: 0,
+
             username: String::new(),
+
             display_input: String::new(),
             internal_input: String::new(),
             input_mode: InputMode::Normal, 
+
             content: Vec::new(),
-            scroll: 0,
             command: String::new(),
+
             size: get_terminal_sizes(),
             max_offset: 0,
+
             api_handler: None,
+
             //hard coded for now TODO: FIX
             temperature: 0,
             max_tokens: 1000, 
