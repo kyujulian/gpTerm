@@ -10,8 +10,8 @@ use tui::{style::{Style, Modifier, Color},
 use terminal_size::{self,Width,Height};
 
 
-use crate::api::{ApiHandler, ApiCall};
-use crate::api::ApiResponse;
+use crate::{text_api::{TextApi, TextApiCall}, api_manager::{ApiManager, CallType}};
+use crate::text_api::TextApiResponse;
 
 fn get_terminal_sizes() -> (u16, u16) {
     let size = terminal_size::terminal_size();
@@ -40,18 +40,18 @@ pub enum MessageType{
     Answer
 }
 
-pub struct Message {
+pub struct DisplayMessage {
     sender: String,
     body: String,
     message_type: MessageType,
 }
 
 
-impl Message {
+impl DisplayMessage {
 
     pub fn from(sender: String, body: String, message_type: MessageType)
-        -> Message {
-        return Message{
+        -> DisplayMessage {
+        return DisplayMessage{
             sender, body, message_type
         }
     }
@@ -90,7 +90,7 @@ pub struct App {
     ///Current input mode,
     input_mode: InputMode,
     ///History of recorded messages
-    content: Vec<Message>,
+    content: Vec<DisplayMessage>,
     ///Scrolling tracker
     scroll: usize,
     max_offset: usize,
@@ -100,13 +100,7 @@ pub struct App {
     ///Terminal size
     pub size: (u16, u16),
     ///Client to communicate with API
-    api_handler: Option<ApiHandler>,
-    ///
-    max_tokens: i32,
-    ///
-    temperature: u8, //dunno what it means yet
-    ///
-    selected_model: String
+    api_manager: Option<ApiManager>,
 }
 
 
@@ -120,15 +114,15 @@ impl App {
         return true
     }
 
-    pub fn get_call(&self) -> &ApiCall {
-        return self.api_handler.as_ref().unwrap().call.as_ref().unwrap()
-    }
-
-    pub fn get_response(&self) -> &ApiResponse {
-        return self.api_handler.as_ref().unwrap().response.as_ref().unwrap()
-    }
-    pub fn set_handler(&mut self, token: String) {
-        self.api_handler = Some(ApiHandler::new(token))
+    // pub fn get_call(&self) -> &TextApiCall {
+    //     return self.api_manager.as_ref().unwrap().call.as_ref().unwrap()
+    // }
+    //
+    // pub fn get_response(&self) -> &TextApiResponse {
+    //     return self.api_manager.as_ref().unwrap().response.as_ref().unwrap()
+    // }
+    pub fn set_api_manager(&mut self, token: String) {
+        self.api_manager = Some(ApiManager::new(token))
     }
 
     pub fn update_input(&mut self) {
@@ -138,11 +132,9 @@ impl App {
     pub async fn answer(&mut self) {
 
         let query = self.get_input();
-        let output = self.api_handler.as_mut().unwrap().answer_from(
-            self.selected_model.clone(),
+        let output = self.api_manager.as_mut().unwrap().answer_from(
             query,
-            self.temperature,
-            self.max_tokens,
+            CallType::Text
         ).await;
 
         self.push_answer(output);
@@ -222,7 +214,7 @@ impl App {
         self.display_input.pop();
     }
 
-    pub fn push_answer(&mut self,message: Message) {
+    pub fn push_answer(&mut self,message: DisplayMessage) {
         self.content.push(message);
         self.internal_input = String::new();
    }
@@ -233,7 +225,7 @@ impl App {
         message_type: MessageType,
         message: String,
     ) {
-        let message = Message {
+        let message = DisplayMessage {
             sender,
             body: message,
             message_type,
@@ -269,7 +261,7 @@ impl App {
         self.size = get_terminal_sizes();
     }
 
-    fn body_from <'a> (&self, message: &'a Message) -> Vec<Spans<'a>> {
+    fn body_from <'a> (&self, message: &'a DisplayMessage) -> Vec<Spans<'a>> {
 
         match message.message_type {
             MessageType::Query => {
@@ -282,7 +274,7 @@ impl App {
             }
         }
     }
-    fn sender_from<'a>(&self, message: &'a Message) -> Spans<'a> {
+    fn sender_from<'a>(&self, message: &'a DisplayMessage) -> Spans<'a> {
 
         match message.message_type {
 
@@ -405,12 +397,8 @@ impl Default for App {
             size: get_terminal_sizes(),
             max_offset: 0,
 
-            api_handler: None,
+            api_manager: None,
 
-            //hard coded for now TODO: FIX
-            temperature: 0,
-            max_tokens: 1000, 
-            selected_model: "text-davinci-003".to_string()
         }
     }
 }

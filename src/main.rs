@@ -2,39 +2,35 @@
 use log::{debug, error, info, trace, warn, LevelFilter, SetLoggerError};
 
 //std
-use std::{error::Error, io::{self, Write, Read}, fs::File};
+use std::{
+    error::Error,
+    fs::File,
+    io::{self, Read, Write},
+};
 
 //tui
 use tui::{
-    backend::{Backend, CrosstermBackend},Terminal
+    backend::{Backend, CrosstermBackend},
+    Terminal,
 };
 
-
-
-use crossterm:: {
+use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode,
-        enable_raw_mode,
-        EnterAlternateScreen,
-        LeaveAlternateScreen
-    }
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-
 
 use app::{App, InputMode, MessageType};
 
-mod logging;
-mod api;
+mod chat_api;
+mod api_manager;
+mod text_api;
 mod app;
+mod logging;
 mod render;
 
-
-
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>>{
-
-    
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //setup logging
 
     let log_file = "./log/logfile";
@@ -42,7 +38,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 
     // Log trace level output to file where trace is the default level
     let _handle = logging::set_logging(log_file, request_file);
-
 
     //setup terminal
     enable_raw_mode()?;
@@ -55,10 +50,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
     //reading api token
     let user = std::env::var("USER").expect("Can access user environment variable");
 
-    let mut config_file = File::open(
-        format!("/home/{}/.config/.gpterm/gpterm.conf",
-                    user.as_str()))
-        .unwrap();
+    let mut config_file = File::open(format!(
+        "/home/{}/.config/.gpterm/gpterm.conf",
+        user.as_str()
+    ))
+    .unwrap();
 
     let mut token = String::new();
 
@@ -67,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 
     //create app and run it -> Singleton
     let mut app = App::default();
-    app.set_handler(token);
+    app.set_api_manager(token);
     app.set_username(user);
 
     let res = run_app(&mut terminal, app);
@@ -89,19 +85,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
     Ok(())
 }
 
-async fn run_app<B: Backend>(terminal : &mut Terminal<B>, mut app: App) -> io::Result<()> {
-
+async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
     // let mut file = File::create("request.txt")?;
     loop {
-
         terminal.draw(|f| render::ui(f, &app))?;
 
         match event::read()? {
-            Event::Resize(_, _) => {
-                app.update_size()
-            }
+            Event::Resize(_, _) => app.update_size(),
             Event::Key(key) => {
-
                 match app.input_mode() {
                     InputMode::Normal => match key.code {
                         KeyCode::Char(':') => {
@@ -127,7 +118,7 @@ async fn run_app<B: Backend>(terminal : &mut Terminal<B>, mut app: App) -> io::R
                                 app.push_content(
                                     app.get_username(),
                                     MessageType::Query,
-                                    app.get_display_input().drain(..).collect()
+                                    app.get_display_input().drain(..).collect(),
                                 );
 
                                 terminal.draw(|f| render::ui(f, &app))?;
@@ -153,37 +144,26 @@ async fn run_app<B: Backend>(terminal : &mut Terminal<B>, mut app: App) -> io::R
                             }
                             _ => {}
                         }
-
                     }
-                    InputMode::Command => {
-                        match key.code {
-
-                            KeyCode::Enter => {
-                                app.send_command();
-                            }
-                            KeyCode::Char(c) => {
-                                app.push_command(c);
-                            }
-                            KeyCode::Backspace => {
-                                app.pop_command();
-                            }
-                            KeyCode::Esc => {
-                                app.reset_command();
-                                app.set_input_mode(InputMode::Normal);
-                            }
-                            _ => {}
+                    InputMode::Command => match key.code {
+                        KeyCode::Enter => {
+                            app.send_command();
                         }
-                    }
+                        KeyCode::Char(c) => {
+                            app.push_command(c);
+                        }
+                        KeyCode::Backspace => {
+                            app.pop_command();
+                        }
+                        KeyCode::Esc => {
+                            app.reset_command();
+                            app.set_input_mode(InputMode::Normal);
+                        }
+                        _ => {}
+                    },
                 }
-
             }
             _ => {}
         }
     }
 }
-
-
-
-
-
-
