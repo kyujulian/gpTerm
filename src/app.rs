@@ -71,6 +71,11 @@ impl Message {
         return normal_line_count + wrapped_line_count; //lines that separate users
     }
 }
+
+pub enum CommandStatus {
+    Okay,
+    Error
+}
 ///App holds the state of the application
 pub struct App {
 
@@ -91,6 +96,7 @@ pub struct App {
     max_offset: usize,
     ///Command
     command: String,
+    command_status: CommandStatus,
     ///Terminal size
     pub size: (u16, u16),
     ///Client to communicate with API
@@ -103,7 +109,16 @@ pub struct App {
     selected_model: String
 }
 
+
 impl App {
+
+
+    pub fn command_active(&self) -> bool {
+        if self.command == String::from("") {
+            return false
+        }
+        return true
+    }
 
     pub fn get_call(&self) -> &ApiCall {
         return self.api_handler.as_ref().unwrap().call.as_ref().unwrap()
@@ -162,7 +177,15 @@ impl App {
     pub fn input_mode(&self) -> InputMode{ 
         return self.input_mode;
     }
+
     pub fn set_input_mode(&mut self, mode: InputMode) {
+        match mode {
+            InputMode::Command => {
+                self.command_status = CommandStatus::Okay;
+                self.command = String::from(':');
+            }
+            _ => {}
+        }
         self.input_mode = mode;
     }
 
@@ -325,6 +348,40 @@ impl App {
         self.username.clone()
     }
 
+    pub fn get_command(&self) -> String {
+        return self.command.clone()
+    }
+
+    pub fn send_command(&mut self) {
+        let commands: Vec<String> = Vec::new();
+
+        if commands.contains(&self.command) {
+            // self.set_input_mode(InputMode::Normal);
+        } else { 
+            self.command = "Error: Command not found".to_string();
+            self.set_input_mode(InputMode::Normal);
+            self.command_status = CommandStatus::Error;
+        }
+        
+    }
+
+    pub fn push_command(&mut self, c: char) {
+        self.command.push(c)
+    }
+
+    pub fn pop_command(&mut self){
+        self.command.pop();
+    }
+
+    pub fn reset_command(&mut self){
+        self.command = String::from("");
+        self.command_status = CommandStatus::Okay;
+    }
+
+    pub fn command_status(&self) -> &CommandStatus {
+        return &self.command_status
+    }
+
 }
 
 
@@ -341,7 +398,9 @@ impl Default for App {
             input_mode: InputMode::Normal, 
 
             content: Vec::new(),
-            command: String::new(),
+
+            command: String::from(""),
+            command_status: CommandStatus::Error,
 
             size: get_terminal_sizes(),
             max_offset: 0,
