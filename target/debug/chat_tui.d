@@ -1,1 +1,0 @@
-/home/daz/ms/rust/book_projects/chat_tui/target/debug/chat_tui: /home/daz/ms/rust/book_projects/chat_tui/src/api.rs /home/daz/ms/rust/book_projects/chat_tui/src/app.rs /home/daz/ms/rust/book_projects/chat_tui/src/main.rs
