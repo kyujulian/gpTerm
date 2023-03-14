@@ -121,15 +121,12 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Re
                                     app.get_display_input().drain(..).collect(),
                                 );
 
+                                app.set_input_mode(InputMode::Normal);
                                 terminal.draw(|f| render::ui(f, &app))?;
                                 app.update_input();
                                 terminal.draw(|f| render::ui(f, &app))?;
 
                                 app.answer().await;
-
-                                // let thing = app.get_call();
-
-                                // file.write_all(format!("{:#?}",thing).as_bytes())?;
 
                                 app.scroll_to_bottom();
                             }

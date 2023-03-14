@@ -2,7 +2,7 @@
 use log::{debug, error, info, trace, warn, LevelFilter, SetLoggerError};
 
 use futures::join;
-use std::future::Future;
+use std::{future::Future, fmt::Display, };
 
 use tui::{style::{Style, Modifier, Color}, 
     text::{Text, Span,Spans}};
@@ -35,11 +35,13 @@ pub enum InputMode{
 }
 
 
+#[derive(Clone,  Debug)]
 pub enum MessageType{
     Query,
     Answer
 }
 
+#[derive(Clone,Debug)]
 pub struct DisplayMessage {
     sender: String,
     body: String,

@@ -86,15 +86,15 @@ impl ChatApi {
         let messages: Vec<ChatMessage> =
             serde_json::from_str(contents.as_str()).expect("couldn't parse chat");
         self.chat = messages;
-        debug!("{:#?}", self.chat);
+        debug!("Chat is:{:#?}", self.chat);
     }
-    pub fn send_display_chat(&self) -> Vec<DisplayMessage> {
-        let mut display_chat = vec![];
-        for message in &self.chat {
-            display_chat.push(self.translate_to_display(message));
-        }
-        return display_chat;
-    }
+    // pub fn send_display_chat(&self) -> Vec<DisplayMessage> {
+    //     let mut display_chat = vec![];
+    //     for message in &self.chat {
+    //         display_chat.push(self.translate_to_display(message));
+    //     }
+    //     return display_chat;
+    // }
     pub fn translate_to_display(&self, message: &ChatMessage) -> DisplayMessage {
         if message.role == "user" {
             DisplayMessage::from(
@@ -106,7 +106,7 @@ impl ChatApi {
             DisplayMessage::from(
                 self.selected_model.clone(),
                 message.content.clone(),
-                MessageType::Query,
+                MessageType::Answer,
             )
         }
     }
@@ -125,7 +125,6 @@ impl ChatApi {
 
     async fn send_api_reqwest(
         &mut self,
-        query: String,
         token: String,
     ) -> Result<ChatApiResponse, reqwest::Error> {
 
@@ -150,6 +149,7 @@ impl ChatApi {
 
         debug!("{:#?}", self.request);
 
+
         match res {
             Ok(okay) => {
                 let debug_json = format!("{:#?}", okay);
@@ -159,6 +159,7 @@ impl ChatApi {
 
                 match json_res {
                     Ok(res) => {
+                        debug!("CHAT IS: {:#?}", self.chat.clone());
                         return Ok(res);
                     }
                     Err(error) => {
@@ -184,14 +185,19 @@ impl ChatApi {
     pub async fn answer_from(&mut self, query: String, token: String) -> DisplayMessage {
 
         self.update_query(query.clone());
-        let res = self.send_api_reqwest(query, token).await;
+        let res = self.send_api_reqwest(token).await;
 
+        debug!("{:#?}", res);
         match res {
             Ok(res) => {
                 self.update_chat(res.clone());
-                self.translate_to_display(&res.get_first_choice().get_message())
+                let mes = self.translate_to_display(&res.get_first_choice().get_message());
+
+                debug!("{:#?}", mes.clone());
+                return mes
+
             }
-            Err(err) => {
+            Err(_) => {
                 error!("Couldn't get api response");
                 DisplayMessage::error(String::from("Some error occurred fetching the api, please
                     try again"))
@@ -208,7 +214,7 @@ impl Default for ChatApi {
             client: reqwest::Client::new(),
             request: None,
             response: None,
-            selected_model: String::new(),
+            selected_model: String::from("Gpt"),
             chat: vec![],
         }
     }

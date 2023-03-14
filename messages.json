@@ -1,6 +1,6 @@
 [
     {
-      "role": "assistant",
-      "content": "\n\nHello there, how may I assist you today?"
+      "role": "system",
+      "content": "\n You are a very scientific assistant."
     }
 ]

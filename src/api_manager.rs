@@ -18,7 +18,7 @@ impl ApiManager {
 
 
     pub fn new(token: String) -> ApiManager {
-        let mut chat_api = ChatApi::new();
+        let mut chat_api = ChatApi::default();
         chat_api.load_file("messages.json".to_string());
         return ApiManager {
             text_api_handler: TextApi::new(),
