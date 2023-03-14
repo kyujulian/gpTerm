@@ -36,7 +36,7 @@ impl ApiManager {
                 self.text_api_handler.answer_from(query,self.token.clone()).await
             }
             CallType::Chat => {
-                self.chat_api_handler.answer_from(query,self.token.clone())
+                self.chat_api_handler.answer_from(query,self.token.clone()).await
             }
         }
     }

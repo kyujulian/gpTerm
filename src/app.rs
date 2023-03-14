@@ -70,6 +70,11 @@ impl DisplayMessage {
 
         return normal_line_count + wrapped_line_count; //lines that separate users
     }
+
+    pub fn error(arg: String) -> DisplayMessage {
+        DisplayMessage::from("YAS - your average system".to_string(),
+            arg, MessageType::Answer)
+    }
 }
 
 pub enum CommandStatus {
@@ -134,7 +139,7 @@ impl App {
         let query = self.get_input();
         let output = self.api_manager.as_mut().unwrap().answer_from(
             query,
-            CallType::Text
+            CallType::Chat
         ).await;
 
         self.push_answer(output);
