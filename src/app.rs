@@ -380,7 +380,6 @@ impl App {
     pub fn command_status(&self) -> &CommandStatus {
         return &self.command_status
     }
-
 }
 
 
@@ -399,7 +398,7 @@ impl Default for App {
             content: Vec::new(),
 
             command: String::from(""),
-            command_status: CommandStatus::Error,
+            command_status: CommandStatus::Okay,
 
             size: get_terminal_sizes(),
             max_offset: 0,

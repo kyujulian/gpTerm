@@ -3,9 +3,9 @@ use log::{debug, error, info, trace, warn, LevelFilter, SetLoggerError};
 
 //std
 use std::{
-    error::Error,
+    // error::Error,
     fs::File,
-    io::{self, Read, Write},
+    io::{self, Read},
 };
 
 //tui

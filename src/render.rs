@@ -1,12 +1,12 @@
-use crossterm:: {
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode,
-        enable_raw_mode,
-        EnterAlternateScreen,
-        LeaveAlternateScreen
-    }
-};
+// use crossterm:: {
+//     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+//     execute,
+//     terminal::{disable_raw_mode,
+//         enable_raw_mode,
+//         EnterAlternateScreen,
+//         LeaveAlternateScreen
+//     }
+// };
 
 use std::{error::Error, io::{self, Write, Read}, fs::File};
 use tui::{
@@ -21,16 +21,17 @@ use tui::{
 use unicode_width::UnicodeWidthStr;
 
 
-use crate::app::{App, InputMode};
+use crate::app::{App, InputMode, CommandStatus};
 
 pub fn ui<B: Backend> (f: &mut Frame<B>, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([
-            Constraint::Percentage(10),
+            Constraint::Percentage(9),
             Constraint::Percentage(80),
             Constraint::Percentage(10),
+            Constraint::Length(1),
         ].as_ref()
     )
     .split(f.size());
@@ -42,7 +43,7 @@ pub fn ui<B: Backend> (f: &mut Frame<B>, app: &App) {
     let (msg, style) = 
         (
             vec![
-                Span::styled(" Davinci ",Style::default()
+                Span::styled(" GPT ",Style::default()
                     .bg(Color::White)
                     .fg(Color::Black)),
                 Span::raw(" Mark "),
@@ -60,13 +61,21 @@ pub fn ui<B: Backend> (f: &mut Frame<B>, app: &App) {
 
     let mut text = Text::from(Spans::from(msg));
     text.patch_style(style);
-    let help_message = Paragraph::new(text).block(Block::default()
+    let models = Paragraph::new(text).block(Block::default()
         .borders(Borders::TOP)
         .title_alignment(Alignment::Center)
         .title("  models  "))
         .alignment(Alignment::Center);
-    f.render_widget(help_message, chunks[0]);
+    f.render_widget(models, chunks[0]);
 
+    let command = Paragraph::new(app.get_command())
+        .style(match app.command_status() {
+            CommandStatus::Error => {
+                Style::default().bg(Color::Black).fg(Color::LightRed)
+            }
+            _ => Style::default().bg(Color::Black).fg(Color::White),
+    })
+    .block(Block::default());
 
     let input = Paragraph::new(app.get_display_input())
         .style(match app.input_mode() {
@@ -78,7 +87,11 @@ pub fn ui<B: Backend> (f: &mut Frame<B>, app: &App) {
     f.render_widget(input, chunks[2]);
 
     match app.input_mode() {
-        InputMode::Normal => {} //Hide the cursor. 'Frame does this by default.
+        InputMode::Normal => {
+            if let crate::app::CommandStatus::Error = app.command_status(){
+                f.render_widget(command, chunks[3]);
+            }
+        } //Hide the cursor. 'Frame does this by default.
         InputMode::Insert => {
             f.set_cursor(
                 chunks[2].x + app.get_display_input().width() as u16,
@@ -86,9 +99,11 @@ pub fn ui<B: Backend> (f: &mut Frame<B>, app: &App) {
             )
         }
         InputMode::Command => {
+
+            f.render_widget(command, chunks[3]);
             f.set_cursor(
-                chunks[2].x + app.get_display_input().width() as u16,
-                chunks[2].y + 1,
+                chunks[3].x + app.get_command().width() as u16,
+                chunks[3].y,
             )
         }
 
