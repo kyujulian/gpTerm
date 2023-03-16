@@ -22,6 +22,8 @@ use crossterm::{
 
 use app::{App, InputMode, MessageType};
 
+
+mod commands;
 mod chat_api;
 mod api_manager;
 mod text_api;
@@ -144,7 +146,10 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Re
                     }
                     InputMode::Command => match key.code {
                         KeyCode::Enter => {
-                            app.send_command();
+                            app.parse_command();
+                            app.execute_command();
+                            app.set_input_mode(InputMode::Normal);
+                            app.reset_command();
                         }
                         KeyCode::Char(c) => {
                             app.push_command(c);

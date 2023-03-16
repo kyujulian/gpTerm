@@ -78,7 +78,7 @@ impl ChatApi {
         }
     }
     pub fn load_file(&mut self, filename: String) {
-        let file = File::open(filename).unwrap();
+        let file = File::open(filename.clone()).expect(format!("should be able to open file {} passed none??", filename.clone()).as_str());
         let mut buf_reader = BufReader::new(file);
         let mut contents = String::new();
         buf_reader.read_to_string(&mut contents).unwrap();
@@ -88,13 +88,18 @@ impl ChatApi {
         self.chat = messages;
         debug!("Chat is:{:#?}", self.chat);
     }
-    // pub fn send_display_chat(&self) -> Vec<DisplayMessage> {
-    //     let mut display_chat = vec![];
-    //     for message in &self.chat {
-    //         display_chat.push(self.translate_to_display(message));
-    //     }
-    //     return display_chat;
-    // }
+
+    pub fn get_display_chat(&self) -> Vec<DisplayMessage> {
+        let mut display_chat :Vec<DisplayMessage> = vec![];
+        for message in &self.chat{
+            display_chat.push(self.translate_to_display(&message));
+        }
+        display_chat
+            .into_iter()
+            .filter(|x| x.get_sender() != "system")
+            .collect()
+    }
+    //
     pub fn translate_to_display(&self, message: &ChatMessage) -> DisplayMessage {
         if message.role == "user" {
             DisplayMessage::from(
@@ -102,7 +107,16 @@ impl ChatApi {
                 message.content.clone(),
                 MessageType::Query,
             )
-        } else {
+        } 
+        
+        else if message.role == "system" {
+            DisplayMessage::from(
+                "system".to_string(),
+                "".to_string(),
+                MessageType::Query,
+            )
+        } 
+        else {
             DisplayMessage::from(
                 self.selected_model.clone(),
                 message.content.clone(),

@@ -1,4 +1,5 @@
 
+use crate::app::DisplayMessage;
 use crate::text_api::{TextApi};
 use crate::chat_api::{ChatApi};
 
@@ -25,6 +26,14 @@ impl ApiManager {
             chat_api_handler: chat_api,
             token
         }
+    }
+
+
+    pub fn load_chat(&mut self, filename: String) {
+        self.chat_api_handler.load_file(String::from(filename.trim()));
+    }
+    pub fn get_display_chat(&self) -> Vec<DisplayMessage> {
+        self.chat_api_handler.get_display_chat()
     }
     pub async fn answer_from (
         &mut self,

@@ -2,17 +2,29 @@
 use log::{debug, error, info, trace, warn, LevelFilter, SetLoggerError};
 
 use futures::join;
-use std::{future::Future, fmt::Display, };
+use std::{fmt::Display, future::Future};
 
-use tui::{style::{Style, Modifier, Color}, 
-    text::{Text, Span,Spans}};
+use tui::{
+    style::{Color, Modifier, Style},
+    text::{Span, Spans, Text},
+};
 
-use terminal_size::{self,Width,Height};
+use terminal_size::{self, Height, Width};
 
-
-use crate::{text_api::{TextApi, TextApiCall}, api_manager::{ApiManager, CallType}};
 use crate::text_api::TextApiResponse;
+use crate::{
+    api_manager::{ApiManager, CallType},
+    commands,
+    text_api::{TextApi, TextApiCall},
+};
 
+
+#[derive(Debug)]
+pub enum Command {
+    LoadChat,
+    SaveChat,
+    Quit,
+}
 fn get_terminal_sizes() -> (u16, u16) {
     let size = terminal_size::terminal_size();
     if let Some((Width(w), Height(h))) = size {
@@ -23,39 +35,33 @@ fn get_terminal_sizes() -> (u16, u16) {
     }
 }
 
-
-
-
-
-#[derive(Clone,Copy)]
-pub enum InputMode{
+#[derive(Clone, Copy)]
+pub enum InputMode {
     Normal,
-    Insert, 
-    Command
+    Insert,
+    Command,
 }
 
-
-#[derive(Clone,  Debug)]
-pub enum MessageType{
+#[derive(Clone, Debug)]
+pub enum MessageType {
     Query,
-    Answer
+    Answer,
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct DisplayMessage {
     sender: String,
     body: String,
     message_type: MessageType,
 }
 
-
 impl DisplayMessage {
-
-    pub fn from(sender: String, body: String, message_type: MessageType)
-        -> DisplayMessage {
-        return DisplayMessage{
-            sender, body, message_type
-        }
+    pub fn from(sender: String, body: String, message_type: MessageType) -> DisplayMessage {
+        return DisplayMessage {
+            sender,
+            body,
+            message_type,
+        };
     }
     pub fn get_body(&self) -> &String {
         return &self.body;
@@ -64,36 +70,47 @@ impl DisplayMessage {
     fn get_body_lines(&self, width: u16) -> usize {
         // let normal_line_count: usize = self.body.chars().filter(|x| x == '\n').count();
         let normal_line_count: usize = self.body.lines().count();
-        let wrapped_line_count: usize= self.body.lines()
+        let wrapped_line_count: usize = self
+            .body
+            .lines()
             .collect::<Vec<&str>>()
             .into_iter()
-            .map(|x| x.chars().count() / width as usize )
+            .map(|x| x.chars().count() / width as usize)
             .sum();
 
         return normal_line_count + wrapped_line_count; //lines that separate users
     }
 
     pub fn error(arg: String) -> DisplayMessage {
-        DisplayMessage::from("YAS - your average system".to_string(),
-            arg, MessageType::Answer)
+        DisplayMessage::from(
+            "YAS - your average system".to_string(),
+            arg,
+            MessageType::Answer,
+        )
+    }
+
+    pub(crate) fn get_sender(&self) -> &str {
+        return self.sender.as_str()
     }
 }
 
 pub enum CommandStatus {
     Okay,
-    Error
+    Error,
 }
 ///App holds the state of the application
 pub struct App {
-
     username: String,
     ///current value of the input box
     should_end: bool,
 
+    //used to format what will be displayed
+    //and to make the chat more responsive
     ///current value displayed on the input box
     display_input: String,
     ///current value of the input box
     internal_input: String,
+
     ///Current input mode,
     input_mode: InputMode,
     ///History of recorded messages
@@ -102,7 +119,9 @@ pub struct App {
     scroll: usize,
     max_offset: usize,
     ///Command
-    command: String,
+    command_display: String,
+    command: Option<Command>,
+
     command_status: CommandStatus,
     ///Terminal size
     pub size: (u16, u16),
@@ -110,15 +129,12 @@ pub struct App {
     api_manager: Option<ApiManager>,
 }
 
-
 impl App {
-
-
     pub fn command_active(&self) -> bool {
-        if self.command == String::from("") {
-            return false
+        if self.command_display == String::from("") {
+            return false;
         }
-        return true
+        return true;
     }
 
     // pub fn get_call(&self) -> &TextApiCall {
@@ -137,29 +153,30 @@ impl App {
         self.display_input = String::new();
     }
     pub async fn answer(&mut self) {
-
         let query = self.get_input();
-        let output = self.api_manager.as_mut().unwrap().answer_from(
-            query,
-            CallType::Chat
-        ).await;
+        let output = self
+            .api_manager
+            .as_mut()
+            .unwrap()
+            .answer_from(query, CallType::Chat)
+            .await;
 
         self.push_answer(output);
     }
 
     pub fn get_max_offset(&mut self) -> usize {
         //nice
-        let body_count : usize= self.content
+        let body_count: usize = self
+            .content
             .iter()
-            .map(|message| {
-                message.get_body_lines(self.size.0)
-            })
+            .map(|message| message.get_body_lines(self.size.0))
             .sum();
 
-         let max = std::cmp::max(
+        let max = std::cmp::max(
             //account for lines and widget height
-            (body_count + 2*self.content.len()) as i32 - 28, 0
-        ) as usize; 
+            (body_count + 2 * self.content.len()) as i32 - 28,
+            0,
+        ) as usize;
 
         self.max_offset = max;
         max
@@ -167,13 +184,13 @@ impl App {
 
     pub fn scroll_to_bottom(&mut self) {
         let scroll = self.get_max_offset(); //widget height
-        if scroll > 0{
+        if scroll > 0 {
             self.scroll = scroll as usize;
             return;
         }
         self.scroll = 0
     }
-    pub fn input_mode(&self) -> InputMode{ 
+    pub fn input_mode(&self) -> InputMode {
         return self.input_mode;
     }
 
@@ -181,14 +198,14 @@ impl App {
         match mode {
             InputMode::Command => {
                 self.command_status = CommandStatus::Okay;
-                self.command = String::from(':');
+                self.command_display = String::from(':');
             }
             _ => {}
         }
         self.input_mode = mode;
     }
 
-    pub fn scroll_down (&mut self) { 
+    pub fn scroll_down(&mut self) {
         if self.scroll != 0 {
             self.scroll -= 1;
         }
@@ -198,40 +215,34 @@ impl App {
         return self.scroll;
     }
 
-    pub fn scroll_up (&mut self) { 
+    pub fn scroll_up(&mut self) {
         if self.scroll < self.max_offset {
             self.scroll += 1;
         }
-        
-    }
-    
-    pub fn get_display_input(&self) -> String {
-        return self.display_input.clone()
     }
 
-    pub fn get_input(&self) -> String{
+    pub fn get_display_input(&self) -> String {
+        return self.display_input.clone();
+    }
+
+    pub fn get_input(&self) -> String {
         return self.internal_input.clone();
     }
 
     pub fn push_input(&mut self, char: char) {
         self.display_input.push(char);
     }
-    
+
     pub fn pop_input(&mut self) {
         self.display_input.pop();
     }
 
-    pub fn push_answer(&mut self,message: DisplayMessage) {
+    pub fn push_answer(&mut self, message: DisplayMessage) {
         self.content.push(message);
         self.internal_input = String::new();
-   }
+    }
 
-
-    pub fn push_content(&mut self,
-        sender: String,
-        message_type: MessageType,
-        message: String,
-    ) {
+    pub fn push_content(&mut self, sender: String, message_type: MessageType, message: String) {
         let message = DisplayMessage {
             sender,
             body: message,
@@ -239,14 +250,11 @@ impl App {
         };
 
         self.content.push(message);
-   }
+    }
 
-
-
-    pub fn get_content(&self) -> Vec<Spans>{
-
+    pub fn get_content(&self) -> Vec<Spans> {
         let mut span_vec: Vec<Spans> = Vec::new();
-        for message in &self.content{
+        for message in &self.content {
             let sender_spans = self.sender_from(&message);
             let body_spans = self.body_from(&message);
 
@@ -259,8 +267,6 @@ impl App {
             }
         }
 
-
-
         return span_vec;
     }
 
@@ -268,62 +274,47 @@ impl App {
         self.size = get_terminal_sizes();
     }
 
-    fn body_from <'a> (&self, message: &'a DisplayMessage) -> Vec<Spans<'a>> {
-
+    fn body_from<'a>(&self, message: &'a DisplayMessage) -> Vec<Spans<'a>> {
         match message.message_type {
             MessageType::Query => {
-                vec![
-                    Spans::from(vec![Span::raw(message.body.clone())])
-                ]
+                vec![Spans::from(vec![Span::raw(message.body.clone())])]
             }
-            MessageType::Answer => {
-                self.parse_answer(&message.body)
-            }
+            MessageType::Answer => self.parse_answer(&message.body),
         }
     }
     fn sender_from<'a>(&self, message: &'a DisplayMessage) -> Spans<'a> {
-
         match message.message_type {
-
-            MessageType::Query => {
-                Spans::from(vec![
-                    Span::styled(
-                        &message.sender,
-                        Style::default()
-                            .add_modifier(Modifier::BOLD)
-                            .fg(Color::Blue)
-                    ),
-                    Span::raw(":"),
-                ])
-            }
-            MessageType::Answer => {
-                Spans::from(vec![
-                    Span::styled(
-                        &message.sender,
-                        Style::default()
-                            .add_modifier(Modifier::BOLD)
-                            .fg(Color::Magenta)
-                    ),
-                    Span::raw(":"),
-                ])
-            }
+            MessageType::Query => Spans::from(vec![
+                Span::styled(
+                    &message.sender,
+                    Style::default()
+                        .add_modifier(Modifier::BOLD)
+                        .fg(Color::Blue),
+                ),
+                Span::raw(":"),
+            ]),
+            MessageType::Answer => Spans::from(vec![
+                Span::styled(
+                    &message.sender,
+                    Style::default()
+                        .add_modifier(Modifier::BOLD)
+                        .fg(Color::Magenta),
+                ),
+                Span::raw(":"),
+            ]),
         }
     }
 
-    fn line_from<'a>(&self, message_type:  &MessageType) -> Spans<'a>{
+    fn line_from<'a>(&self, message_type: &MessageType) -> Spans<'a> {
         match message_type {
-            MessageType::Query => {
-                Spans::from (
-                    vec![Span::styled(format!("{:─>width$}","",width=self.size.0 as usize ),
-                        Style::default().fg(Color::Blue))]
-                )
-            }
-            MessageType::Answer => {
-                Spans::from (
-                    vec![Span::styled(format!("{:─>width$}","",width=self.size.0 as usize ),
-                        Style::default().fg(Color::Magenta))]
-                )
-            }
+            MessageType::Query => Spans::from(vec![Span::styled(
+                format!("{:─>width$}", "", width = self.size.0 as usize),
+                Style::default().fg(Color::Blue),
+            )]),
+            MessageType::Answer => Spans::from(vec![Span::styled(
+                format!("{:─>width$}", "", width = self.size.0 as usize),
+                Style::default().fg(Color::Magenta),
+            )]),
         }
     }
 
@@ -333,9 +324,7 @@ impl App {
         let mut span_vec: Vec<Spans> = Vec::new();
 
         for line in partial {
-            span_vec.push(
-                Spans::from(vec![Span::raw(line)])
-            );
+            span_vec.push(Spans::from(vec![Span::raw(line)]));
         }
 
         return span_vec;
@@ -348,40 +337,99 @@ impl App {
     }
 
     pub fn get_command(&self) -> String {
-        return self.command.clone()
+        return self.command_display.clone();
     }
 
-    pub fn send_command(&mut self) {
-        let commands: Vec<String> = Vec::new();
+    pub fn parse_command(&mut self) {
+        self.command_display = self.command_display.to_lowercase();
 
-        if commands.contains(&self.command) {
-            // self.set_input_mode(InputMode::Normal);
-        } else { 
-            self.command = "Error: Command not found".to_string();
-            self.set_input_mode(InputMode::Normal);
+
+        //i'm sure that there is a more elegant solution to this
+        //but will keep like this for now.
+        if self.command_display.starts_with(":load-chat") {
+            self.command = Some(Command::LoadChat);
+        }
+        else if self.command_display.starts_with(":save-chat") {
+            self.command_display = "save-chat command".to_string();
+            self.command = Some(Command::LoadChat);
+        }
+        else if self.command_display.starts_with(":quit") {
+            self.command_display = "should quit".to_string();
+            self.command = Some(Command::Quit);
+        }
+        else {
             self.command_status = CommandStatus::Error;
         }
-        
+    }
+
+    fn load_chat(&mut self,chat_file: String) {
+        match &mut self.api_manager {
+            Some(manager) => {
+                manager.load_chat(chat_file);
+            }
+            None => {
+                error!("Tried to call api_manager without defining it... MAJOR ERROR");
+                return;
+            }
+        }
+    }
+
+
+
+    pub fn execute_command(&mut self) {
+        self.parse_command();
+        debug!("{:#?}", self.command);
+        match &mut self.command {
+            Some(command) =>{
+                match command {
+                    Command::LoadChat => {
+
+                        let loc_command = String::from(self.command_display.clone());
+                        let displayed :Vec<&str> = loc_command
+                                                        .split(' ').collect();
+
+                        // debug!("{:#?}", self.command);
+                        // debug!("{:#?}", self.command_display);
+                        let chat_to_load = displayed[1];
+                        // debug!("chatfile is {}" ,chat_to_load);
+                        // debug!("loc_command is {}", loc_command);
+                        self.load_chat(format!("{}", String::from(chat_to_load)));
+                        self.content = self.api_manager.as_ref().expect("API MANAGER SHOULD BE CONSTRUCTED").get_display_chat();
+
+                    }
+                    Command::SaveChat => {
+                        todo!();
+                    }
+                    Command::Quit => {
+                        todo!();
+                    }
+
+                }
+        }
+            None => {
+                debug!("Was told to execute command, but it was not set!");
+                self.command_status = CommandStatus::Error;
+            }
+        }
     }
 
     pub fn push_command(&mut self, c: char) {
-        self.command.push(c)
+        self.command_display.push(c)
     }
 
-    pub fn pop_command(&mut self){
-        self.command.pop();
+    pub fn pop_command(&mut self) {
+        self.command_display.pop();
     }
 
-    pub fn reset_command(&mut self){
-        self.command = String::from("");
+    pub fn reset_command(&mut self) {
+        self.command_display = String::from("");
         self.command_status = CommandStatus::Okay;
     }
 
     pub fn command_status(&self) -> &CommandStatus {
-        return &self.command_status
+        return &self.command_status;
     }
 }
-
 
 impl Default for App {
     fn default() -> App {
@@ -393,20 +441,19 @@ impl Default for App {
 
             display_input: String::new(),
             internal_input: String::new(),
-            input_mode: InputMode::Normal, 
+
+            input_mode: InputMode::Normal,
 
             content: Vec::new(),
 
-            command: String::from(""),
+            command_display: String::from(""),
+            command: None,
             command_status: CommandStatus::Okay,
 
             size: get_terminal_sizes(),
             max_offset: 0,
 
             api_manager: None,
-
         }
     }
 }
-
-
