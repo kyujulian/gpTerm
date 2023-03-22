@@ -1,5 +1,5 @@
 //logging
-use crate::app::{DisplayMessage, MessageType};
+use crate::app::{DisplayMessage, MessageType, AppError};
 use log::{debug, error, info, trace, warn, LevelFilter, SetLoggerError};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -19,6 +19,7 @@ impl ChatMessage {
         ChatMessage { role, content }
     }
 }
+
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ChatApiRequest {
@@ -77,16 +78,37 @@ impl ChatApi {
             chat: vec![],
         }
     }
-    pub fn load_file(&mut self, filename: String) {
-        let file = File::open(filename.clone()).expect(format!("should be able to open file {} passed none??", filename.clone()).as_str());
+    pub fn load_file(&mut self, filename: String) -> Result <(), AppError>{
+        
+        let file = File::open(filename.clone())?;
+            // .expect(format!("should be able to open file {} passed none??", filename.clone()).as_str());
         let mut buf_reader = BufReader::new(file);
         let mut contents = String::new();
         buf_reader.read_to_string(&mut contents).unwrap();
 
-        let messages: Vec<ChatMessage> =
-            serde_json::from_str(contents.as_str()).expect("couldn't parse chat");
+
+        let messages: Vec<ChatMessage> = serde_json::from_str(contents.as_str())?;
+
+        //let messages: Vec<ChatMessage> = serde_json::from_str(contents.as_str()).expect("couldn't parse chat");
+
+        // match serde_json::from_str(contents.as_str())
+        //  {
+        //     Ok(parsed_messages) => {
+        //         let messages: Vec<ChatMessage> = parsed_messages;
+        //         self.chat = messages;
+        //     }
+        //     Err(_) =>{
+        //         Err(return AppError {
+        //             message: "Couldn't parse chat file".to_string();
+        //         })
+        //     }
+        // }
+        // let messages: Vec<ChatMessage> =
+        // 
+
         self.chat = messages;
         debug!("Chat is:{:#?}", self.chat);
+        Ok(())
     }
 
     pub fn get_display_chat(&self) -> Vec<DisplayMessage> {
@@ -102,7 +124,7 @@ impl ChatApi {
     //
     pub fn translate_to_display(&self, message: &ChatMessage) -> DisplayMessage {
         if message.role == "user" {
-            DisplayMessage::from(
+            DisplayMessage::new(
                 "user".to_string(),
                 message.content.clone(),
                 MessageType::Query,
@@ -110,14 +132,14 @@ impl ChatApi {
         } 
         
         else if message.role == "system" {
-            DisplayMessage::from(
+            DisplayMessage::new(
                 "system".to_string(),
                 "".to_string(),
                 MessageType::Query,
             )
         } 
         else {
-            DisplayMessage::from(
+            DisplayMessage::new(
                 self.selected_model.clone(),
                 message.content.clone(),
                 MessageType::Answer,

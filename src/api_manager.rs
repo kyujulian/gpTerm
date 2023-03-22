@@ -1,5 +1,5 @@
 
-use crate::app::DisplayMessage;
+use crate::app::{AppError,DisplayMessage};
 use crate::text_api::{TextApi};
 use crate::chat_api::{ChatApi};
 
@@ -18,19 +18,26 @@ pub struct ApiManager {
 impl ApiManager {
 
 
-    pub fn new(token: String) -> ApiManager {
+    pub fn new(token: String) -> Result<ApiManager,AppError> {
         let mut chat_api = ChatApi::default();
-        chat_api.load_file("messages.json".to_string());
-        return ApiManager {
-            text_api_handler: TextApi::new(),
-            chat_api_handler: chat_api,
-            token
+        match chat_api.load_file("messages.json".to_string()) {
+            Ok(_) => {
+                return Ok(ApiManager {
+                    text_api_handler: TextApi::new(),
+                    chat_api_handler: chat_api,
+                    token
+                })
+            }
+            Err(err) => {
+                return Err(err)
+            }
         }
     }
 
 
-    pub fn load_chat(&mut self, filename: String) {
-        self.chat_api_handler.load_file(String::from(filename.trim()));
+    pub fn load_chat(&mut self, filename: String) -> Result< (), AppError> {
+        self.chat_api_handler.load_file(String::from(filename.trim()))?;
+        Ok(())
     }
     pub fn get_display_chat(&self) -> Vec<DisplayMessage> {
         self.chat_api_handler.get_display_chat()

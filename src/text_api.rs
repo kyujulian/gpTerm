@@ -209,7 +209,7 @@ impl TextApi {
             }
         }
 
-        return DisplayMessage::from(sender, body, MessageType::Answer);
+        return DisplayMessage::new(sender, body, MessageType::Answer);
     }
 }
 

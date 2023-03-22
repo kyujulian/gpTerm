@@ -2,7 +2,7 @@
 use log::{debug, error, info, trace, warn, LevelFilter, SetLoggerError};
 
 use futures::join;
-use std::{fmt::Display, future::Future};
+use std::{future::Future, path::Display};
 
 use tui::{
     style::{Color, Modifier, Style},
@@ -17,6 +17,44 @@ use crate::{
     commands,
     text_api::{TextApi, TextApiCall},
 };
+
+use std::fmt;
+
+#[derive(Debug)]
+pub struct AppError{ 
+    message: String,
+}
+impl AppError {
+    pub fn message(&self) -> String{
+        return self.message.clone()
+    }
+}
+
+
+impl From<std::io::Error> for AppError {
+    fn from(error: std::io::Error) -> Self{
+        AppError {
+            message: format!(
+                "{:#?}",
+                error
+            )
+        }
+    }
+}
+impl From<serde_json::error::Error> for AppError {
+    fn from(error : serde_json::error::Error) -> Self {
+        AppError {
+            message: format!(
+                "failed to parse json data, problem on line {}, and column {}",
+                error.line(), error.column()).to_string()
+        }
+    }
+}
+
+
+
+
+
 
 
 #[derive(Debug)]
@@ -55,8 +93,17 @@ pub struct DisplayMessage {
     message_type: MessageType,
 }
 
+impl From<AppError> for DisplayMessage {
+    fn from( error: AppError) -> Self {
+        return DisplayMessage { 
+            sender: "YAS - Your Average System".to_string(),
+            body: error.message(),
+            message_type: MessageType::Answer }
+    }
+}
+
 impl DisplayMessage {
-    pub fn from(sender: String, body: String, message_type: MessageType) -> DisplayMessage {
+    pub fn new(sender: String, body: String, message_type: MessageType) -> DisplayMessage {
         return DisplayMessage {
             sender,
             body,
@@ -82,7 +129,7 @@ impl DisplayMessage {
     }
 
     pub fn error(arg: String) -> DisplayMessage {
-        DisplayMessage::from(
+        DisplayMessage::new(
             "YAS - your average system".to_string(),
             arg,
             MessageType::Answer,
@@ -145,7 +192,16 @@ impl App {
     //     return self.api_manager.as_ref().unwrap().response.as_ref().unwrap()
     // }
     pub fn set_api_manager(&mut self, token: String) {
-        self.api_manager = Some(ApiManager::new(token))
+        match ApiManager::new(token) {
+            Ok(api_manager) => {
+                self.api_manager = Some(api_manager);
+            }
+            Err(err) => {
+                self.push_answer(
+                    DisplayMessage::from(err)
+                )
+            }
+        }
     }
 
     pub fn update_input(&mut self) {
@@ -362,14 +418,14 @@ impl App {
         }
     }
 
-    fn load_chat(&mut self,chat_file: String) {
+    fn load_chat(&mut self,chat_file: String) -> Result<(), AppError> {
         match &mut self.api_manager {
             Some(manager) => {
-                manager.load_chat(chat_file);
+                manager.load_chat(chat_file)
             }
             None => {
                 error!("Tried to call api_manager without defining it... MAJOR ERROR");
-                return;
+                panic!("api manager should be working");
             }
         }
     }
@@ -385,17 +441,20 @@ impl App {
                     Command::LoadChat => {
 
                         let loc_command = String::from(self.command_display.clone());
-                        let displayed :Vec<&str> = loc_command
-                                                        .split(' ').collect();
-
+                        let displayed :Vec<&str> = loc_command.split(' ').collect();
                         // debug!("{:#?}", self.command);
                         // debug!("{:#?}", self.command_display);
                         let chat_to_load = displayed[1];
                         // debug!("chatfile is {}" ,chat_to_load);
                         // debug!("loc_command is {}", loc_command);
-                        self.load_chat(format!("{}", String::from(chat_to_load)));
-                        self.content = self.api_manager.as_ref().expect("API MANAGER SHOULD BE CONSTRUCTED").get_display_chat();
-
+                        match self.load_chat(format!("{}", String::from(chat_to_load))) {
+                            Ok(_) => {
+                                self.content = self.api_manager.as_ref().expect("API MANAGER SHOULD BE CONSTRUCTED").get_display_chat();
+                            },
+                            Err (err) => {
+                                self.push_answer(DisplayMessage::from(err));
+                            }
+                        }
                     }
                     Command::SaveChat => {
                         todo!();
@@ -403,7 +462,6 @@ impl App {
                     Command::Quit => {
                         todo!();
                     }
-
                 }
         }
             None => {
