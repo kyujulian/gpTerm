@@ -4,7 +4,7 @@ use log::{debug, error, info, trace, warn, LevelFilter, SetLoggerError};
 //std
 use std::{
     // error::Error,
-    fs::File,
+    fs::{File, self},
     io::{self, Read},
 };
 
@@ -22,6 +22,10 @@ use crossterm::{
 
 use app::{App, InputMode, MessageType};
 
+use serde::Deserialize;
+
+use toml::ser::SerializeTable::Table;
+
 
 mod commands;
 mod chat_api;
@@ -30,6 +34,11 @@ mod text_api;
 mod app;
 mod logging;
 mod render;
+
+#[derive(Deserialize)]
+struct Config {
+    token: String
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -52,20 +61,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //reading api token
     let user = std::env::var("USER").expect("Can access user environment variable");
 
-    let mut config_file = File::open(format!(
-        "/home/{}/.config/.gpterm/gpterm.conf",
+    //fix this error handling
+    let mut config_file = fs::read_to_string(format!(
+        "/home/{}/.config/gpterm/gpterm.toml",
         user.as_str()
     ))
     .unwrap();
 
-    let mut token = String::new();
 
-    config_file.read_to_string(&mut token).unwrap();
-    token = token.trim().to_string();
+    let mut config_string = String::new();
+    let configs_toml: Config = toml::from_str(config_file.as_str()).unwrap();
 
     //create app and run it -> Singleton
     let mut app = App::default();
-    app.set_api_manager(token);
+    app.set_api_manager(configs_toml.token);
     app.set_username(user);
 
     let res = run_app(&mut terminal, app);
