@@ -1,12 +1,3 @@
-// use crossterm:: {
-//     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-//     execute,
-//     terminal::{disable_raw_mode,
-//         enable_raw_mode,
-//         EnterAlternateScreen,
-//         LeaveAlternateScreen
-//     }
-// };
 
 use std::{error::Error, io::{self, Write, Read}, fs::File};
 use tui::{
@@ -43,17 +34,10 @@ pub fn ui<B: Backend> (f: &mut Frame<B>, app: &App) {
     let (msg, style) = 
         (
             vec![
-                Span::styled(" GPT ",Style::default()
+                Span::styled("GPT-3.5",Style::default()
                     .bg(Color::White)
                     .fg(Color::Black)),
-                Span::raw(" Mark "),
-                Span::raw(" Dall-e "),
-                Span::raw(" Curie "),
-                Span::raw(" Ada "),
-                // Span::styled("q", Style::default().add_modifier(Modifier::BOLD)),
-                // Span::raw(" to exit, "),
-                // Span::styled("e", Style::default().add_modifier(Modifier::BOLD)),
-                // Span::raw(" to start editing."),
+                // Span::raw(" GPT-4 "),
             ],
             Style::default().add_modifier(Modifier::RAPID_BLINK),
        );
@@ -64,7 +48,7 @@ pub fn ui<B: Backend> (f: &mut Frame<B>, app: &App) {
     let models = Paragraph::new(text).block(Block::default()
         .borders(Borders::TOP)
         .title_alignment(Alignment::Center)
-        .title("  models  "))
+        .title("  Models  "))
         .alignment(Alignment::Center);
     f.render_widget(models, chunks[0]);
 
@@ -83,7 +67,7 @@ pub fn ui<B: Backend> (f: &mut Frame<B>, app: &App) {
             InputMode::Insert => Style::default().fg(Color::Blue),
             InputMode::Command => Style::default().fg(Color::Yellow),
     })
-    .block(Block::default().borders(Borders::TOP).title("Query")).wrap(Wrap{trim: false});
+    .block(Block::default().borders(Borders::TOP).title(" Input ")).wrap(Wrap{trim: false});
     f.render_widget(input, chunks[2]);
 
     match app.input_mode() {
@@ -114,8 +98,8 @@ pub fn ui<B: Backend> (f: &mut Frame<B>, app: &App) {
     let messages = 
         Paragraph::new(messages).block(Block::default()
         .borders(Borders::TOP)
-        .title("chat"))
-        .alignment(Alignment::Left)
+        .title_alignment(Alignment::Center)
+        .title(" Chat "))
         .wrap(Wrap{trim: false})
         .scroll((app.get_scroll() as u16,0));
     f.render_widget(messages,chunks[1]);
